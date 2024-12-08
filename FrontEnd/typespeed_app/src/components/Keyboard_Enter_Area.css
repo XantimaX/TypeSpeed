@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.working-area{
+    margin: 0 auto;
+    color : #646669;
+    height: 100px;
+    width:1000px;
+    min-width:500px;
+    background-color: #323437;
+}
