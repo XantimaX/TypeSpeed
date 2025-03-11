@@ -5,25 +5,78 @@ import Letter from "./letter_custom"
 
 const Main_Style = {margin : "0 auto" , height : "200px" ,width : "600px"} //Will be used for the typing area if tailwind classes are not enough 
 
+let limit = 3 //how many incorrect letters to show up in the word
+
+
 let KeyboardArea = function(){
-    function changeColor(word_pointer, letter_pointer, color, words_jsx){
-        console.log(words_jsx[word_pointer])
+    function add_letter(word_id, letter){
+        let new_words_objects_array = word_objects_array.map((i)=>{
+            if (i.word_id === word_id){
+                console.log("pushed")
+                let new_letter = { letter_id : i.letters.length+1, letter : letter, color : 2}
+                i.letters = [...i.letters, new_letter]
+            }
+            return i
+        })
+
+        word_objects_array_setter(new_words_objects_array)
+    }
+
+    function changeColor(wordID, letterID, color, words_jsx){
+        let new_words_objects_array = word_objects_array.map((word_object) => {
+            if (word_object.word_id === wordID){
+                let new_letters = word_object.letters.map((letter_object) => {
+                    if (letterID === letter_object.letter_id){
+                        return {...letter_object, color : color}
+                    }
+                    return letter_object
+                })
+                return {...word_object, letters : new_letters}
+            }
+            return word_object
+        })
+        // console.log(new_words_objects)
+        word_objects_array_setter(new_words_objects_array)
+    }
+
+    function is_alpha_num(input_string){
+        let c = input_string.charAt(0)
+        return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9')
     }
     //created words_jsx which is a state. This will carry the words that will be displayed to the user
-    let [words_array, words_setter] = React.useState([])
+    let [word_objects_array, word_objects_array_setter] = React.useState([])
     let [words_jsx, words_jsx_setter] = React.useState([])
     let [current_word_pointer, current_word_pointer_setter] = React.useState(0)
     let [letter_pointer, letter_pointer_setter] = React.useState(0)
     let [input_value, input_value_setter] = React.useState("")
-
-
+    
     React.useEffect( () => {
         
         let api_call = async function(){
              const url = "https://random-word-api.herokuapp.com/word?number=100"
              const response = await fetch(url)
              const data = await response.json()
-             words_setter(data)
+             let new_words_objects = []
+
+             for (let i = 0 ; i < data.length; i++){
+                new_words_objects[i] = {
+                    word_id : i,
+                    word : data[i],
+                    letters : [] ,
+                    actual_word_size : 0
+                }
+
+                for (let j = 0 ; j < data[i].length; j++){
+                    new_words_objects[i].letters[j] = {
+                        letter_id : j,
+                        letter : data[i].charAt(j),
+                        color : 0
+                    }
+                }
+                new_words_objects[i].actual_word_size = new_words_objects[i].letters.length
+             }
+
+             word_objects_array_setter(new_words_objects)
         }
         
         api_call().catch(console.error)
@@ -32,10 +85,10 @@ let KeyboardArea = function(){
     React.useEffect( () => {
         words_jsx_setter(() => change_words_JSX())
         
-    }, [words_array]
+    }, [word_objects_array]
     ) 
     
-  
+    React.useEffect(() => {console.log()})
     
     // let [keys_pressed, keys_pressed_setter] = React.useState("")
 
@@ -47,10 +100,12 @@ let KeyboardArea = function(){
 
     //increment letter pointer
     let increment_letter_pointer = function(){
-        letter_pointer_setter((old) => words_jsx[current_word_pointer].length !== old ? old+1 : old)
+        letter_pointer_setter((old) => old+1 )
     }
     let decrement_letter_pointer = function(){
         let new_value = letter_pointer-1
+        changeColor(current_word_pointer, new_value, 0, words_jsx) //changing the color of letter to grey
+
         console.log(`letter pointer : ${new_value}`)
         if (new_value === -1) {
             if (current_word_pointer === 0)
@@ -81,13 +136,7 @@ let KeyboardArea = function(){
 
     //detect keys pressed by the user
     let track_keys = function(event) {
-        
-        // if (letter_pointer === current_word.length){
-            //     increment_word_pointer()
-            //     letter_pointer_setter(() => 0)
-            //     return
-            // }
-            
+    
             const new_key = event.key
             
             //Backspace functionality
@@ -97,31 +146,33 @@ let KeyboardArea = function(){
                 return
             }
             else if (new_key === " "){
-                letter_pointer_setter(() => 0)
+
+                letter_pointer_setter(0)
                 increment_word_pointer()
                 return
             }
-            
+        
+        if (new_key.length != 1 || !is_alpha_num(new_key)){return}
         let current_word = words_jsx[current_word_pointer].props.children
-        console.log(letter_pointer)
-        console.log(new_key)
         
-        // console.log(current_word_pointer)
-        // console.log(words_jsx[current_word_pointer])
+        let current_letter = current_word[letter_pointer] && current_word[letter_pointer].props.character
+            
         
-        
-        // console.log(current_word[letter_pointer])
-        // console.log(current_word[letter_pointer])
-        let current_letter = current_word[letter_pointer].props.character
-        
-        console.log(current_letter)
-        console.log(current_word[letter_pointer])
+        if (!current_letter && ((letter_pointer+1) - current_word.length  <= limit )){
+            console.log("Yes")
+            add_letter(current_word_pointer, new_key)
+        }
         if(current_letter == new_key){
-            changeColor(current_word_pointer, letter_pointer, 1, words_jsx)
+            changeColor(current_word_pointer, letter_pointer, 1, words_jsx) //1 -> green
             console.log("Matched")
         }
+        else if (current_letter != new_key ){
+            changeColor(current_word_pointer, letter_pointer, 2, words_jsx)
+        }
+        
         
         increment_letter_pointer()
+        
         
     }
     
@@ -133,12 +184,15 @@ let KeyboardArea = function(){
 
     let change_words_JSX = function() {
         let id = 1;
-        let new_words_jsx = words_array.map((i) => {
+
+        let new_words_jsx = word_objects_array.map((i) => {
             let word_jsx = []
-             for (let index = 0 ; index < i.length; index++){
-                 const currChar = i.charAt(index);
+            let letters = i.letters;
+             for (let index = 0 ; index < letters.length; index++){
+               
+                 const currChar = letters[index].letter, currID = letters[index].letterID, color = letters[index].color;
      
-                 word_jsx = [...word_jsx, <Letter id = {index+1} character = {currChar}></Letter>]
+                 word_jsx = [...word_jsx, <Letter id = {currID} character = {currChar} color = {color} ></Letter>]
              }
              
              return <div className="word p-1" id = {id++}>{word_jsx}</div>
@@ -152,7 +206,7 @@ let KeyboardArea = function(){
             <div style = {Main_Style} id = "main_word_area" className = "bg-main-color flex flex-wrap" >
                 {words_jsx}
             </div>
-            <input type="text" id ="typing-input" autoFocus onChange={check_input_value} onKeyDown={track_keys}></input>
+            <input type="text" id ="typing-input"  autoFocus onChange={check_input_value} onKeyDown={track_keys}></input>
         </>
     )
 }
