@@ -12,8 +12,7 @@ let KeyboardArea = function(){
     function add_letter(word_id, letter){
         let new_words_objects_array = word_objects_array.map((i)=>{
             if (i.word_id === word_id){
-                console.log("pushed")
-                let new_letter = { letter_id : i.letters.length+1, letter : letter, color : 2}
+                let new_letter = { letter_id : i.letters.length, letter : letter, color : 2}
                 i.letters = [...i.letters, new_letter]
             }
             return i
@@ -22,11 +21,12 @@ let KeyboardArea = function(){
         word_objects_array_setter(new_words_objects_array)
     }
 
-    function changeColor(wordID, letterID, color, words_jsx){
+    function changeColor(word_id, letter_id, color){
         let new_words_objects_array = word_objects_array.map((word_object) => {
-            if (word_object.word_id === wordID){
+            if (word_object.word_id === word_id){
                 let new_letters = word_object.letters.map((letter_object) => {
-                    if (letterID === letter_object.letter_id){
+                    if (letter_id === letter_object.letter_id){
+                        
                         return {...letter_object, color : color}
                     }
                     return letter_object
@@ -35,7 +35,6 @@ let KeyboardArea = function(){
             }
             return word_object
         })
-        // console.log(new_words_objects)
         word_objects_array_setter(new_words_objects_array)
     }
 
@@ -43,6 +42,17 @@ let KeyboardArea = function(){
         let c = input_string.charAt(0)
         return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9')
     }
+
+    function delete_letter(word_id, letter_id){
+        let new_word_objects_array = word_objects_array.map((word) => {
+            if (word.word_id === word_id){
+               word.letters.pop()
+            }
+            return word
+        })
+        word_objects_array_setter(new_word_objects_array)
+    }
+
     //created words_jsx which is a state. This will carry the words that will be displayed to the user
     let [word_objects_array, word_objects_array_setter] = React.useState([])
     let [words_jsx, words_jsx_setter] = React.useState([])
@@ -88,7 +98,6 @@ let KeyboardArea = function(){
     }, [word_objects_array]
     ) 
     
-    React.useEffect(() => {console.log()})
     
     // let [keys_pressed, keys_pressed_setter] = React.useState("")
 
@@ -100,13 +109,12 @@ let KeyboardArea = function(){
 
     //increment letter pointer
     let increment_letter_pointer = function(){
-        letter_pointer_setter((old) => old+1 )
+        letter_pointer_setter((old) => old < word_objects_array[current_word_pointer].actual_word_size + limit ? old+1 : old)
     }
     let decrement_letter_pointer = function(){
         let new_value = letter_pointer-1
         changeColor(current_word_pointer, new_value, 0, words_jsx) //changing the color of letter to grey
 
-        console.log(`letter pointer : ${new_value}`)
         if (new_value === -1) {
             if (current_word_pointer === 0)
                     letter_pointer_setter(() => 0)
@@ -114,11 +122,8 @@ let KeyboardArea = function(){
                 
                 letter_pointer_setter(() => {
                     let previous_word_pointer = current_word_pointer-1
-                    console.log(`word pointer : ${previous_word_pointer}`)
-                    console.log(words_jsx[previous_word_pointer])
                     return words_jsx[previous_word_pointer].props.children.length
                 })
-                console.log(`letter pointer : ${new_value}`)
                 decrement_word_pointer()
             }
             return
@@ -138,12 +143,18 @@ let KeyboardArea = function(){
     let track_keys = function(event) {
     
             const new_key = event.key
+            let current_word = word_objects_array[current_word_pointer]
+            let current_letters = current_word.letters
+        
+            let current_letter = current_letters[letter_pointer] && current_letters[letter_pointer].letter
             
             //Backspace functionality
             if (new_key === "Backspace"){
+                //if this is wrongly typed letter, remove it
+                if (letter_pointer > current_word.actual_word_size) delete_letter(current_word_pointer, letter_pointer)
                 decrement_letter_pointer()   
                 
-                return
+                return 
             }
             else if (new_key === " "){
 
@@ -153,18 +164,17 @@ let KeyboardArea = function(){
             }
         
         if (new_key.length != 1 || !is_alpha_num(new_key)){return}
-        let current_word = words_jsx[current_word_pointer].props.children
         
-        let current_letter = current_word[letter_pointer] && current_word[letter_pointer].props.character
+        
+        
+        
             
         
-        if (!current_letter && ((letter_pointer+1) - current_word.length  <= limit )){
-            console.log("Yes")
+        if (!current_letter && ((letter_pointer+1) - current_word.actual_word_size  <= limit )){
             add_letter(current_word_pointer, new_key)
         }
         if(current_letter == new_key){
             changeColor(current_word_pointer, letter_pointer, 1, words_jsx) //1 -> green
-            console.log("Matched")
         }
         else if (current_letter != new_key ){
             changeColor(current_word_pointer, letter_pointer, 2, words_jsx)
@@ -189,8 +199,7 @@ let KeyboardArea = function(){
             let word_jsx = []
             let letters = i.letters;
              for (let index = 0 ; index < letters.length; index++){
-               
-                 const currChar = letters[index].letter, currID = letters[index].letterID, color = letters[index].color;
+                 const currChar = letters[index].letter, currID = letters[index].letter_id, color = letters[index].color;
      
                  word_jsx = [...word_jsx, <Letter id = {currID} character = {currChar} color = {color} ></Letter>]
              }
